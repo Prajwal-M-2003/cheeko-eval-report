@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+env/
+.venv/
+venv/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Tooling / editor
+.vscode/
+.idea/
+
+# Test / coverage artifacts
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Project runtime state
+state/
+.deepeval/
+
+# Generated reports and archives
+reports/*_latest.html
+reports/*_eval_report.html
+reports/*_eval_report_*.html
+reports/*.md
+
+# Local temporary files
+*.log
+*.tmp
+*.bak
+.cache/
+.cache
