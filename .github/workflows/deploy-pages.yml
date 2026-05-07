@@ -14,8 +14,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
       - run: |
-          mkdir site
-          copy docs\index.html site\index.html
+          mkdir -p site
+          cp reports/cheeko_v1_google_eval_report.html site/index.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
