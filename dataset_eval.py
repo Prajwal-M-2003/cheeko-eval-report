@@ -7,14 +7,28 @@ from scenario descriptions, then evaluates them with DeepEval metrics.
 Run:  python dataset_eval.py
 """
 import os
+import sys
 from dotenv import load_dotenv
 
 from deepeval.dataset import EvaluationDataset, ConversationalGolden
 from deepeval.test_case import Turn, TurnParams
 from deepeval.simulator import ConversationSimulator
 from deepeval.metrics import TurnRelevancyMetric, ConversationalGEval
-from deepeval.models import GeminiModel
 from deepeval import evaluate
+from model_factory import build_judge_model
+
+
+def _configure_console_utf8() -> None:
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if stream and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
+
+
+_configure_console_utf8()
 
 TARGET_DEVICE = os.getenv("TARGET_DEVICE", "v1").strip().lower()
 if TARGET_DEVICE == "v2":
@@ -28,18 +42,8 @@ else:
 
 load_dotenv()
 
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-
-# gemini-2.5-flash is a "thinking" model. When thinking is ON, response.parsed
-# returns None for structured JSON schema calls (which the simulator needs).
-# Fix: pass thinking_budget=0 to disable thinking for the simulator instance.
-# The metrics instance keeps thinking ON for better evaluation quality.
-simulator_model = GeminiModel(
-    "gemini-2.5-flash",
-    api_key=GOOGLE_API_KEY,
-    generation_kwargs={"thinking_config": {"thinking_budget": 0}},
-)
-metrics_model = GeminiModel("gemini-2.5-flash", api_key=GOOGLE_API_KEY)
+simulator_model = build_judge_model(purpose="simulator", for_simulator=True)
+metrics_model = build_judge_model(purpose="metrics")
 
 # ── Dataset: define scenarios ──────────────────────────────────────────────────
 dataset = EvaluationDataset(

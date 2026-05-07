@@ -7,6 +7,8 @@ import re
 from dotenv import load_dotenv
 from google import genai
 from openai import OpenAI
+import httpx
+from network_env import disable_broken_loopback_proxy_env
 
 load_dotenv()
 
@@ -1346,7 +1348,12 @@ def get_cheeko_answer(question: str, history: list[dict] | None = None) -> str:
     if provider == "xai":
         if not xai_api_key:
             return "XAI_API_KEY is missing in .env."
-        client = OpenAI(api_key=xai_api_key, base_url=xai_base_url)
+        disable_broken_loopback_proxy_env()
+        client = OpenAI(
+            api_key=xai_api_key,
+            base_url=xai_base_url,
+            http_client=httpx.Client(trust_env=False),
+        )
         messages = [{"role": "system", "content": CHEEKO_SYSTEM_PROMPT}]
         if history:
             for turn in history:
