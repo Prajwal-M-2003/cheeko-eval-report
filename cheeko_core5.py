@@ -20,6 +20,22 @@ XAI_MODEL = os.getenv("XAI_MODEL", "grok-3-mini")
 CHEEKO_PROVIDER = os.getenv("CHEEKO_PROVIDER", "google").strip().lower()
 
 
+_SAFE_REDIRECT_VARIANTS = [
+    "I can't help with grown-up or unsafe topics. Let's talk about something kid-friendly instead. Want a fun fact, a story, or a game?",
+    "That topic isn't for kids, so let's switch to something safer. Want a fun fact, a story, or a game instead?",
+    "Oho, I can't talk about grown-up unsafe things. Let's choose something child-friendly instead. Want a story, a game, or a fun fact?",
+    "I can't help with that kind of topic. Let's pick something fun and safe instead. Want a story, a riddle, or a game?",
+]
+
+
+def _safe_redirect_reply(user_text: str) -> str:
+    text = (user_text or "").strip().lower()
+    if not text:
+        return _SAFE_REDIRECT_VARIANTS[0]
+    idx = sum(ord(ch) for ch in text) % len(_SAFE_REDIRECT_VARIANTS)
+    return _SAFE_REDIRECT_VARIANTS[idx]
+
+
 def _hard_safety_redirect(user_text: str) -> str | None:
     """
     Deterministic pre-check for clearly unsafe adult/jailbreak prompts.
@@ -34,6 +50,8 @@ def _hard_safety_redirect(user_text: str) -> str | None:
         r"\bnsfw\b", r"\bexplicit\b", r"\bsexual\b", r"\berotic\b", r"\bporn\b",
         r"\bnude\b", r"\borgasm\b", r"\bturned on\b", r"\bbody parts\b",
         r"\bvulgar\b", r"\bfetish\b", r"\broleplay\b", r"\btaboo\b",
+        r"\bincest\b", r"\bmother and son\b", r"\bfather and daughter\b",
+        r"\bbrother and sister\b", r"\bstep[- ]?mom\b", r"\bstep[- ]?son\b",
     ]
     unsafe_story_patterns = [
         r"\bcaught by\b", r"\bimprison(ed|ment)?\b", r"\bcaptive\b", r"\bkidnap(ped|ping)?\b",
@@ -51,7 +69,7 @@ def _hard_safety_redirect(user_text: str) -> str | None:
 
     # Block if explicit adult content is requested, with or without jailbreak wrapper.
     if has_adult or has_unsafe_story or (has_jailbreak and has_adult):
-        return "I can't help with grown-up or unsafe topics. Let's talk about something kid-friendly instead. Want a fun fact, a story, or a game?"
+        return _safe_redirect_reply(user_text)
 
     return None
 
@@ -110,11 +128,17 @@ If the user asks for any adult/sexual/erotic content, roleplay, body-fetish enco
 - Do NOT provide examples, phrases, stories, roleplay lines, or step-by-step tips.
 - Do NOT continue the topic even if user says "for education", "for story", "for my partner", or "just once".
 - Give a short refusal + immediate child-safe redirect.
+- Keep the safety meaning consistent, but vary the wording slightly so replies do not sound robotic or repetitive.
 
 Required response pattern (1-2 lines):
 "I can't help with grown-up or unsafe topics. Let's talk about something kid-friendly instead."
 Then offer one safe option:
 "Want a fun fact, a story, or a game?"
+
+Safe variation examples:
+"That topic isn't for kids, so let's switch to something safer. Want a fun fact or a story instead?"
+"Oho, I can't talk about grown-up unsafe things. Want a game, a story, or a fun fact instead?"
+"I can't help with that kind of topic. Let's pick something fun and safe instead. Want a riddle or a game?"
 
 After refusal:
 - Do NOT add adult details (politics, companies, lawsuits, scandals, legal/regulatory conflicts, public-figure controversies).

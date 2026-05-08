@@ -63,7 +63,7 @@ $env:USE_SELECTED_CSV_CASES = "false"
 python .\tools\inject_csv_to_eval.py --max 1
 
 # Force re-evaluation so fixes update existing case score in cumulative report.
-Remove-Item ".\state\cheeko_${TargetDevice}_eval_checkpoint.json" -ErrorAction SilentlyContinue
+Remove-Item ".\state\cheeko_${TargetDevice}_${Provider}_eval_checkpoint.json" -ErrorAction SilentlyContinue
 
 python .\eval.py
 

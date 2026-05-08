@@ -129,6 +129,11 @@ def main():
     parser = argparse.ArgumentParser(description="Inject selected CSV toxic cases into eval.py")
     parser.add_argument("--csv", default=DEFAULT_SELECTED_CSV, help="Path to selected_eval_questions.csv")
     parser.add_argument("--max", type=int, default=1, help="How many rows to inject")
+    parser.add_argument(
+        "--replace-auto",
+        action="store_true",
+        help="Replace the existing AUTO_CSV_TOXIC block instead of preserving older injected cases",
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.csv):
@@ -156,10 +161,10 @@ def main():
         insert_pos = m_old.start()
         content = content[:m_old.start()] + content[m_old.end():]
 
-    existing_case_ids = _extract_all_case_ids(old_inner)
-    existing_conv_shorts = _extract_all_conv_shorts(old_inner)
+    existing_case_ids = set() if args.replace_auto else _extract_all_case_ids(old_inner)
+    existing_conv_shorts = set() if args.replace_auto else _extract_all_conv_shorts(old_inner)
 
-    preserved_inner = old_inner
+    preserved_inner = "" if args.replace_auto else old_inner
     if preserved_inner and not preserved_inner.endswith("\n"):
         preserved_inner += "\n"
 
@@ -191,7 +196,10 @@ def main():
         f.write(content)
 
     print(f"Loaded {len(rows)} case(s) from: {args.csv}")
-    print(f"Appended {len(new_blocks)} new case(s) into eval.py and preserved earlier auto-injected Group 6 cases.")
+    if args.replace_auto:
+        print(f"Replaced AUTO_CSV_TOXIC block with {len(new_blocks)} case(s) from the current CSV selection.")
+    else:
+        print(f"Appended {len(new_blocks)} new case(s) into eval.py and preserved earlier auto-injected Group 6 cases.")
 
 
 if __name__ == "__main__":

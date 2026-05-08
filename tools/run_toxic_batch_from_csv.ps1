@@ -1,5 +1,5 @@
 param(
-    [int]$StartIndex = 0,
+    [int]$StartIndex = -1,
     [int]$Count = 50,
     [string]$TargetDevice = "v1",
     [string]$Provider = "xai",
@@ -9,6 +9,19 @@ param(
 $ErrorActionPreference = "Stop"
 
 Set-Location (Split-Path -Parent $PSScriptRoot)
+
+if ($StartIndex -lt 0) {
+    $resolved = python .\tools\resolve_next_toxic_start.py --target-device $TargetDevice --provider $Provider
+    $resolved = "$resolved".Trim()
+    if (-not $resolved) {
+        throw "Could not resolve next pending toxic start index."
+    }
+    $StartIndex = [int]$resolved
+    if ($StartIndex -lt 0) {
+        throw "All toxic CSV cases are already completed."
+    }
+    Write-Host "Auto-selected next pending StartIndex: $StartIndex"
+}
 
 $env:TOXIC_START_INDEX = "$StartIndex"
 $env:TOXIC_COUNT = "$Count"
@@ -32,10 +45,12 @@ import json
 import os
 import re
 import pandas as pd
+from pathlib import Path
 
 csv_sel = "selected_eval_questions.csv"
 device = (os.getenv("TARGET_DEVICE", "v1") or "v1").strip().lower()
-state_path = os.path.join("state", f"cheeko_{device}_executed_results.json")
+provider = (os.getenv("CHEEKO_PROVIDER", "google") or "google").strip().lower()
+report_path = Path("reports") / f"cheeko_{device}_{provider}_eval_report.html"
 
 if not os.path.exists(csv_sel):
     print("Selection file not found, skipping duplicate check.")
@@ -45,16 +60,11 @@ df = pd.read_csv(csv_sel)
 selected_ids = set(df["conv_id"].astype(str).str.slice(0, 12).str.lower().tolist())
 
 done_ids = set()
-if os.path.exists(state_path):
+if report_path.exists():
     try:
-        with open(state_path, "r", encoding="utf-8") as f:
-            data = json.load(f) or {}
-        for k in data.keys():
-            if "Group 6: Toxicity::Toxic Prompt - " not in k:
-                continue
-            m = re.search(r"\[([0-9a-fA-F]{8,})\]", k)
-            if m:
-                done_ids.add(m.group(1).lower())
+        html = report_path.read_text(encoding="utf-8", errors="ignore")
+        for m in re.findall(r"\[([0-9a-fA-F]{8,})\]", html):
+            done_ids.add(m.lower())
     except Exception:
         pass
 
@@ -72,10 +82,10 @@ print("=============================")
 print("")
 '@ | python -
 
-python .\tools\inject_csv_to_eval.py --max $Count
+python .\tools\inject_csv_to_eval.py --max $Count --replace-auto
 
 # Re-evaluate now-injected set and update cumulative report.
-Remove-Item ".\state\cheeko_${TargetDevice}_eval_checkpoint.json" -ErrorAction SilentlyContinue
+Remove-Item ".\state\cheeko_${TargetDevice}_${Provider}_eval_checkpoint.json" -ErrorAction SilentlyContinue
 
 python .\eval.py
 
@@ -105,4 +115,4 @@ if (Test-Path $arcPath) {
 }
 
 # Private terminal-only CSV progress (not added to report HTML).
-python .\tools\toxic_csv_progress.py --target-device $TargetDevice
+python .\tools\toxic_csv_progress.py --target-device $TargetDevice --provider $Provider

@@ -1,63 +1,37 @@
 import argparse
-import json
 import os
-import re
-
-import pandas as pd
-
-
-DEFAULT_CSV = r"C:\Users\mpraj\Downloads\toxic-chat_annotation_all.csv"
-
-
-def _extract_short_ids_from_state(state_path: str) -> set[str]:
-    if not os.path.exists(state_path):
-        return set()
-    try:
-        with open(state_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-    except Exception:
-        return set()
-
-    ids = set()
-    for key in (data or {}).keys():
-        # Example key:
-        # Group 6: Toxicity::Toxic Prompt - ... [e167541c122e]
-        if "Group 6: Toxicity::" not in key:
-            continue
-        # Strictly count only CSV-injected style titles.
-        # This avoids mixing unrelated/manual/non-CSV toxicity tests.
-        if "Group 6: Toxicity::Toxic Prompt - " not in key:
-            continue
-        m = re.search(r"\[([0-9a-fA-F]{8,})\]", key)
-        if m:
-            ids.add(m.group(1).lower())
-    return ids
+from provider_report_progress import (
+    DEFAULT_CSV,
+    extract_report_ids,
+    extract_report_total,
+    get_provider_report_path,
+    load_toxic_csv_ids,
+)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Show toxicity CSV execution progress.")
     parser.add_argument("--target-device", default=os.getenv("TARGET_DEVICE", "v1"), help="v1 or v2")
+    parser.add_argument("--provider", default=os.getenv("CHEEKO_PROVIDER", "google"), help="google or xai")
     parser.add_argument("--csv", default=os.getenv("TOXIC_CSV_PATH", DEFAULT_CSV), help="Path to toxicity CSV")
     args = parser.parse_args()
 
     device = (args.target_device or "v1").strip().lower()
+    provider = (args.provider or "google").strip().lower()
     csv_path = args.csv
 
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"CSV not found: {csv_path}")
 
-    df = pd.read_csv(csv_path)
-    toxic_df = df[df["toxicity"] == 1].copy()
-    toxic_df["conv_short"] = toxic_df["conv_id"].astype(str).str.slice(0, 12).str.lower()
-
-    all_ids = toxic_df["conv_short"].tolist()
+    all_ids = load_toxic_csv_ids(csv_path)
     all_id_set = set(all_ids)
 
-    state_path = os.path.join(os.getcwd(), "state", f"cheeko_{device}_executed_results.json")
-    done_ids = _extract_short_ids_from_state(state_path)
+    report_path = get_provider_report_path(device, provider)
+    done_ids = extract_report_ids(report_path)
     done_in_csv = done_ids.intersection(all_id_set)
+    report_total = extract_report_total(report_path)
 
-    total = len(toxic_df)
+    total = len(all_ids)
     done = len(done_in_csv)
     pending = max(total - done, 0)
     pct = (done / total * 100.0) if total else 0.0
@@ -73,11 +47,15 @@ def main() -> None:
     print("")
     print("=== Toxic CSV Progress ===")
     print(f"Device: {device}")
+    print(f"Provider: {provider}")
     print(f"CSV: {csv_path}")
+    print(f"Report file: {report_path}")
     print(f"Total toxic rows: {total}")
-    print(f"Done (executed in Group 6): {done}")
+    print(f"Done in provider report: {done}")
+    print(f"Total tests in provider report: {report_total}")
     print(f"Pending: {pending}")
     print(f"Progress: {pct:.1f}%")
+    print(f"Next sequential case number: {report_total + 1 if pending else 'none'}")
     if next_pending_index is not None:
         print(f"Next pending start index: {next_pending_index} (conv_id short: {next_pending_id})")
     else:
