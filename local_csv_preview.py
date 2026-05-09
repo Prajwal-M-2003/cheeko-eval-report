@@ -37,6 +37,7 @@ def main():
 
     device = (os.getenv("TARGET_DEVICE", "v1") or "v1").strip().lower()
     provider = (os.getenv("CHEEKO_PROVIDER", "google") or "google").strip().lower()
+    case_id_base_env = os.getenv("CASE_ID_BASE")
     report_total = extract_report_total(get_provider_report_path(device, provider))
 
     toxic_start = max(0, toxic_start)
@@ -57,14 +58,18 @@ def main():
 
     selected = pd.concat([t, j, s], ignore_index=True)
     selected = selected[["case_type", "conv_id", "toxicity", "jailbreaking", "user_input"]]
-    selected.insert(0, "case_id", range(report_total + 1, report_total + 1 + len(selected)))
+    if case_id_base_env is not None and str(case_id_base_env).strip() != "":
+        case_id_start = int(case_id_base_env)
+    else:
+        case_id_start = report_total + 1
+    selected.insert(0, "case_id", range(case_id_start, case_id_start + len(selected)))
 
     out_csv = "selected_eval_questions.csv"
     selected.to_csv(out_csv, index=False, encoding="utf-8")
     print(f"\nSaved easy shortlist: {out_csv}")
 
     print(f"Selected rows for eval: {len(selected)}")
-    print(f"Sequential case_id start: {report_total + 1}")
+    print(f"Sequential case_id start: {case_id_start}")
     print(f"CSV start index used internally: {toxic_start}")
     print("\nCopy these questions into eval.py:")
     for _, row in selected.iterrows():
