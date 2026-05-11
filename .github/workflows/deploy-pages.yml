@@ -18,7 +18,10 @@ jobs:
       - uses: actions/configure-pages@v5
       - run: |
           mkdir -p site
-          cp reports/cheeko_v1_google_eval_report.html site/index.html
+          cp index.html site/index.html
+          cp docs/google.html site/google.html
+          cp docs/xai.html site/xai.html
+          cp docs/comparison.html site/comparison.html
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
